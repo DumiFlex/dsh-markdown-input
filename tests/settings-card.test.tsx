@@ -36,6 +36,12 @@ function makeForm(options: {
 const t = (key: keyof typeof en) => en[key]
 
 describe('Markdown Input bundle settings page', () => {
+  it('keeps the bundle page informative when the host form service is missing', () => {
+    const Card = createMarkdownInputSettingsCard(undefined, t)
+    const view = render(<Card />)
+    expect(view.getByRole('status').textContent).toContain('unavailable')
+  })
+
   it('saves the composer and user-message toggles independently', async () => {
     const form = makeForm()
     const Card = createMarkdownInputSettingsCard(form, t)

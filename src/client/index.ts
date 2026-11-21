@@ -110,9 +110,8 @@ function installSettingsCard(ctx: ClientContext): void {
     } | undefined
     form = forms?.get?.('markdown-input')
   } catch {
-    return
+    // Keep the page visible; the card explains when the host form is missing.
   }
-  if (!form) return
 
   const t = ctx.locale.bind(NS)
   const Card = createMarkdownInputSettingsCard(form, t)

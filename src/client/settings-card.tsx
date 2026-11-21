@@ -20,9 +20,15 @@ export interface MarkdownInputSettingsForm {
  * page supplies the navigation/title; this card owns the actual preferences.
  */
 export function createMarkdownInputSettingsCard(
-  form: MarkdownInputSettingsForm,
+  form: MarkdownInputSettingsForm | undefined,
   t: (key: ComposerKey) => string,
 ): () => JSX.Element {
+  if (!form) {
+    return function UnavailableMarkdownInputSettingsCard(): JSX.Element {
+      return <p role="status">{t('settings.unavailable')}</p>
+    }
+  }
+
   return function MarkdownInputSettingsCard(): JSX.Element {
     const snapshot = useSyncExternalStore(
       listener => form.subscribe(listener),
