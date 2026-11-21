@@ -38,7 +38,7 @@ Every surface probes the host before it activates and degrades on its own: built
 
 ## Settings and plugin compatibility
 
-Both slot-replacing features are **off by default** to avoid taking over the composer or message-rendering seats used by other plugins. In the dsh plugin settings, enable **Markdown composer takeover** and/or **Markdown-rendered user messages** independently. Changes are applied when the web UI/plugin reloads. Rich-text paste conversion is only active inside the Markdown composer; the native composer remains untouched when that feature is off.
+Both slot-replacing features are **off by default** to avoid taking over the composer or message-rendering seats used by other plugins. In DSH Settings, open the **Markdown Input** plugin's settings and enable **Markdown composer takeover** and/or **Markdown-rendered user messages** independently. These are generated from the plugin's volatile Config fields and are available in Desktop and Web. After saving, reload the UI/plugin for the selected features to take effect. Rich-text paste conversion is only active inside the Markdown composer; the native composer remains untouched when that feature is off.
 
 ## Install
 

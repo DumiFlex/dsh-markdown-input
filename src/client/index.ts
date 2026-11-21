@@ -92,19 +92,66 @@ function present(value: unknown): boolean {
 }
 
 /**
- * Read the plugin's generated ConfigForm snapshot. Missing forms or a read
- * failure intentionally disable both slot-replacing features.
+ * Wait for the generated ConfigForm's first Host snapshot before deciding
+ * which slot-replacing features to register. The form starts in `loading`,
+ * so reading it once during client apply would silently ignore enabled flags.
+ * Missing/unavailable forms remain safely disabled.
  * @param ctx - client root context.
+ * @param ready - called once with the accepted settings snapshot.
  */
-function readFeatureSettings(ctx: ClientContext): MarkdownInputSettings {
+function watchFeatureSettings(
+  ctx: ClientContext,
+  ready: (settings: MarkdownInputSettings) => void,
+): void {
+  let form: {
+    getSnapshot?(): { status?: string; value?: unknown }
+    subscribe?(listener: () => void): () => void
+  } | undefined
   try {
     const forms = ctx.get('configForms') as {
-      get?(namespace: string): { getSnapshot?(): { value?: unknown } } | undefined
+      get?(namespace: string): typeof form
     } | undefined
-    return markdownInputSettingsOf(forms?.get?.('markdown-input')?.getSnapshot?.()?.value)
+    form = forms?.get?.('markdown-input')
   } catch {
-    return markdownInputSettingsOf(undefined)
+    return
   }
+  if (!form?.getSnapshot || !form.subscribe) return
+
+  let settled = false
+  let unsubscribe = () => {}
+  const stop = () => {
+    unsubscribe()
+    unsubscribe = () => {}
+  }
+  const acceptReadySnapshot = () => {
+    if (settled) return
+    let snapshot: { status?: string; value?: unknown } | undefined
+    try {
+      snapshot = form.getSnapshot?.()
+    } catch {
+      settled = true
+      stop()
+      return
+    }
+    if (snapshot?.status === 'unavailable') {
+      settled = true
+      stop()
+      return
+    }
+    if (snapshot?.status !== 'ready') return
+    settled = true
+    stop()
+    ready(markdownInputSettingsOf(snapshot.value))
+  }
+
+  ctx.effect(() => {
+    unsubscribe = form.subscribe?.(acceptReadySnapshot) ?? (() => {})
+    // Some form implementations may notify synchronously from subscribe;
+    // in that case the callback ran before `unsubscribe` was assigned.
+    if (settled) stop()
+    acceptReadySnapshot()
+    return stop
+  }, 'markdown-input: feature settings')
 }
 
 /**
@@ -332,86 +379,87 @@ export function apply(ctx: ClientContext): void {
   // same lazy, capability-detected way: a host build without the service
   // keeps the native default (queue — the pre-#79 behavior).
   installBusyEnterSource(ctx)
-  const featureSettings = readFeatureSettings(ctx)
-  // Card-level crash latch (ADR-0005): a render exception inside the card —
-  // or an editor-face probe failure — funnels into the unified fallback
-  // (degrade.ts), which latches the takeover off for the page life and
-  // disposes this chain entry: the election collapses, the chain fallback
-  // (the native composer) tops back in, and the machine draft the card
-  // flushed on unmount survives. The latch outlives the entry — a later
-  // session scope re-runs this inject thunk but must not re-attempt the
-  // takeover; only reloading the browser half restarts it.
-  let disposeEntry: (() => void) | undefined
-  if (featureSettings.composerEnabled) {
-    bindComposerCrash(() => {
-      const dispose = disposeEntry
-      disposeEntry = undefined
-      dispose?.()
-    })
-    ctx.slots.inject('conversation.composer', () => {
-      // Session latch: once degraded, the native composer stays for the rest
-      // of the page life (ADR-0005 Q5).
-      if (takeoverDegraded()) return () => {}
-      const dispose = ctx.slots.register({
-        name: 'conversation.composer',
-        // After approvals/questions (1) and the subagent read-only composer
-        // (-10): pending interactions keep precedence over Markdown editing.
-        priority: 2,
-        select: () => MARKDOWN_TAKEOVER,
-        locale: NS,
-      }, TakeoverCard)
-      disposeEntry = dispose
-      return () => {
-        if (disposeEntry === dispose) disposeEntry = undefined
-        dispose()
-      }
-    })
-  }
-  // Keyed replacement of the user-message seats — turn-opening (`user`) and
-  // queued mid-turn (`steering`) bubbles share identical node data and both
-  // go Markdown; every other chat node kind keeps the host's own renderers.
-  // The host registers the same keys at its default priority 0, and the
-  // registry throws on same-key-same-priority: shadow it at a lower rank
-  // (lowest renders), falling back to the host seat when we deregister.
-  // Gated on the primitives probe: a host build missing any composed value
-  // (Markdown pipeline or copy/clock chrome) keeps the host's own renderers
-  // — native bubbles with the native actions row.
-  const messageCapability = userMessageCapability(primitives)
-  if (messageCapability.supported && featureSettings.messageMarkdownEnabled) {
-    for (const key of ['user', 'steering'] as const) {
-      ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
-        name: 'conversation.chat.node',
-        key,
-        priority: -1,
-        locale: 'chat',
-        // The session scope's binding key rides the inject positionally (the
-        // native keyed-entry mechanism — the renderer passes the sessionId
-        // as the first argument): it is what scopes the bubble's chip
-        // activations (#75). The declared `ChatNodeInjected` face carries
-        // only hook factories, so the widened inject is cast — the runtime
-        // merges whatever the inject returns into the seat's props.
-        inject: ((sessionId: unknown) => ({
-          sessionId: typeof sessionId === 'string' ? sessionId : undefined,
-        })) as never,
-      }, MarkdownUserMessage))
+  watchFeatureSettings(ctx, (featureSettings) => {
+    // Card-level crash latch (ADR-0005): a render exception inside the card —
+    // or an editor-face probe failure — funnels into the unified fallback
+    // (degrade.ts), which latches the takeover off for the page life and
+    // disposes this chain entry: the election collapses, the chain fallback
+    // (the native composer) tops back in, and the machine draft the card
+    // flushed on unmount survives. The latch outlives the entry — a later
+    // session scope re-runs this inject thunk but must not re-attempt the
+    // takeover; only reloading the browser half restarts it.
+    let disposeEntry: (() => void) | undefined
+    if (featureSettings.composerEnabled) {
+      bindComposerCrash(() => {
+        const dispose = disposeEntry
+        disposeEntry = undefined
+        dispose?.()
+      })
+      ctx.slots.inject('conversation.composer', () => {
+        // Session latch: once degraded, the native composer stays for the rest
+        // of the page life (ADR-0005 Q5).
+        if (takeoverDegraded()) return () => {}
+        const dispose = ctx.slots.register({
+          name: 'conversation.composer',
+          // After approvals/questions (1) and the subagent read-only composer
+          // (-10): pending interactions keep precedence over Markdown editing.
+          priority: 2,
+          select: () => MARKDOWN_TAKEOVER,
+          locale: NS,
+        }, TakeoverCard)
+        disposeEntry = dispose
+        return () => {
+          if (disposeEntry === dispose) disposeEntry = undefined
+          dispose()
+        }
+      })
     }
-    // The submission echo's text run (#77): the keyed `conversation.user.
-    // text.node` slot has no factory to shadow — the host registers its
-    // 'text'/'session' entries at priority 100, so the same lower-rank
-    // shadow as the seats above puts the echo text through the Markdown
-    // projection its durable bubble uses. Keyed 'text' only: the host's
-    // 'session' entry (the wire-form chip) keeps serving. Gated on the same
-    // primitives probe — the entry composes the identical pipeline.
-    ctx.slots.inject('conversation.user.text.node', () => ctx.slots.register({
-      name: 'conversation.user.text.node',
-      key: 'text',
-      priority: -1,
-    }, MarkdownEchoText))
-  } else if (!featureSettings.messageMarkdownEnabled) {
-    console.info('[markdown-input] user-message Markdown rendering is off in plugin settings')
-  } else {
-    console.info(`[markdown-input] user-message Markdown rendering disabled: ${messageCapability.reason}`)
-  }
+    // Keyed replacement of the user-message seats — turn-opening (`user`) and
+    // queued mid-turn (`steering`) bubbles share identical node data and both
+    // go Markdown; every other chat node kind keeps the host's own renderers.
+    // The host registers the same keys at its default priority 0, and the
+    // registry throws on same-key-same-priority: shadow it at a lower rank
+    // (lowest renders), falling back to the host seat when we deregister.
+    // Gated on the primitives probe: a host build missing any composed value
+    // (Markdown pipeline or copy/clock chrome) keeps the host's own renderers
+    // — native bubbles with the native actions row.
+    const messageCapability = userMessageCapability(primitives)
+    if (messageCapability.supported && featureSettings.messageMarkdownEnabled) {
+      for (const key of ['user', 'steering'] as const) {
+        ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
+          name: 'conversation.chat.node',
+          key,
+          priority: -1,
+          locale: 'chat',
+          // The session scope's binding key rides the inject positionally (the
+          // native keyed-entry mechanism — the renderer passes the sessionId
+          // as the first argument): it is what scopes the bubble's chip
+          // activations (#75). The declared `ChatNodeInjected` face carries
+          // only hook factories, so the widened inject is cast — the runtime
+          // merges whatever the inject returns into the seat's props.
+          inject: ((sessionId: unknown) => ({
+            sessionId: typeof sessionId === 'string' ? sessionId : undefined,
+          })) as never,
+        }, MarkdownUserMessage))
+      }
+      // The submission echo's text run (#77): the keyed `conversation.user.
+      // text.node` slot has no factory to shadow — the host registers its
+      // 'text'/'session' entries at priority 100, so the same lower-rank
+      // shadow as the seats above puts the echo text through the Markdown
+      // projection its durable bubble uses. Keyed 'text' only: the host's
+      // 'session' entry (the wire-form chip) keeps serving. Gated on the same
+      // primitives probe — the entry composes the identical pipeline.
+      ctx.slots.inject('conversation.user.text.node', () => ctx.slots.register({
+        name: 'conversation.user.text.node',
+        key: 'text',
+        priority: -1,
+      }, MarkdownEchoText))
+    } else if (!featureSettings.messageMarkdownEnabled) {
+      console.info('[markdown-input] user-message Markdown rendering is off in plugin settings')
+    } else {
+      console.info(`[markdown-input] user-message Markdown rendering disabled: ${messageCapability.reason}`)
+    }
+  })
   // Degradation notice (ADR-0005 Q5): quiet until the takeover falls back,
   // then the one-shot non-modal notice — event-driven over degrade.ts, so
   // it survives the card's unmount and never re-shows. The declared locale

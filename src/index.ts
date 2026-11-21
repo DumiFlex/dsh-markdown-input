@@ -13,8 +13,8 @@ import z from '@deepseek-ai/schemastery'
 
 /** User-facing feature settings; both risky slot replacements are opt-in. */
 export const Config = z.object({
-  composerEnabled: z.boolean().default(false).description('Enable the Markdown composer takeover.'),
-  messageMarkdownEnabled: z.boolean().default(false).description('Render sent user and queued messages as Markdown.'),
+  composerEnabled: z.boolean().default(false).volatile().description('Enable the Markdown composer takeover.'),
+  messageMarkdownEnabled: z.boolean().default(false).volatile().description('Render sent user and queued messages as Markdown.'),
 })
 
 /** Plugin id used by cordis patch rows to locate this module. */

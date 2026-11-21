@@ -24,7 +24,12 @@ function recordedContext(): { ctx: ClientContext, disposers: readonly ReturnType
   const ctx = {
     get(key: string): unknown {
       return key === 'configForms'
-        ? { get: () => ({ getSnapshot: () => ({ value: { composerEnabled: true, messageMarkdownEnabled: true } }) }) }
+        ? {
+            get: () => ({
+              getSnapshot: () => ({ status: 'ready', value: { composerEnabled: true, messageMarkdownEnabled: true } }),
+              subscribe: () => () => {},
+            }),
+          }
         : undefined
     },
     effect(fn: () => unknown): unknown {

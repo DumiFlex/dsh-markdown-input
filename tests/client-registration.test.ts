@@ -50,17 +50,25 @@ function recordedContext(options: {
   sidebarRight?: unknown
   sessions?: unknown
   featureSettings?: unknown
+  featureSettingsStatus?: 'loading' | 'ready' | 'unavailable'
 } = {}): {
   ctx: ClientContext
   injected: readonly string[]
   registrations: readonly RecordedRegistration[]
   dictionaries: readonly unknown[][]
   binds: readonly string[]
+  notifyFeatureSettingsReady: () => void
 } {
   const injected: string[] = []
   const registrations: RecordedRegistration[] = []
   const dictionaries: unknown[][] = []
   const binds: string[] = []
+  const featureListeners: Array<() => void> = []
+  let featureSettingsStatus = options.featureSettingsStatus ?? 'ready'
+  const notifyFeatureSettingsReady = () => {
+    featureSettingsStatus = 'ready'
+    for (const listener of featureListeners) listener()
+  }
   const ctx = {
     get(key: string): unknown {
       // The host gateway installs namespaces as `remote.<ns>` services; the
@@ -76,7 +84,19 @@ function recordedContext(options: {
         return {
           get(namespace: string): unknown {
             return namespace === 'markdown-input'
-              ? { getSnapshot: () => ({ value: options.featureSettings === undefined ? { composerEnabled: true, messageMarkdownEnabled: true } : options.featureSettings }) }
+              ? {
+                getSnapshot: () => ({
+                  status: featureSettingsStatus,
+                  value: options.featureSettings === undefined ? { composerEnabled: true, messageMarkdownEnabled: true } : options.featureSettings,
+                }),
+                subscribe(listener: () => void) {
+                  featureListeners.push(listener)
+                  return () => {
+                    const index = featureListeners.indexOf(listener)
+                    if (index >= 0) featureListeners.splice(index, 1)
+                  }
+                },
+              }
               : undefined
           },
         }
@@ -115,7 +135,7 @@ function recordedContext(options: {
       },
     },
   } as unknown as ClientContext
-  return { ctx, injected, registrations, dictionaries, binds }
+  return { ctx, injected, registrations, dictionaries, binds, notifyFeatureSettingsReady }
 }
 
 afterEach(() => {
@@ -138,6 +158,20 @@ describe('client apply registration', () => {
     expect(injected).not.toContain('conversation.chat.node')
     expect(injected).not.toContain('conversation.user.text.node')
     expect(registrations.map(entry => entry.name)).toEqual(['conversation.composer.dock'])
+  })
+
+  it('waits for the first accepted settings snapshot before registering feature seats', () => {
+    const { ctx, injected, registrations, notifyFeatureSettingsReady } = recordedContext({
+      featureSettingsStatus: 'loading',
+    })
+    apply(ctx)
+    expect(injected).not.toContain('conversation.composer')
+    expect(injected).not.toContain('conversation.chat.node')
+
+    notifyFeatureSettingsReady()
+    expect(injected).toContain('conversation.composer')
+    expect(injected).toContain('conversation.chat.node')
+    expect(registrations.some(entry => entry.name === 'conversation.composer')).toBe(true)
   })
 
   it('takes over the composer through one low-priority chain entry', () => {
