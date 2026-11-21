@@ -89,6 +89,7 @@ function recordedContext(options: {
                   status: featureSettingsStatus,
                   value: options.featureSettings === undefined ? { composerEnabled: true, messageMarkdownEnabled: true } : options.featureSettings,
                 }),
+                writable: true,
                 subscribe(listener: () => void) {
                   featureListeners.push(listener)
                   return () => {
@@ -96,6 +97,7 @@ function recordedContext(options: {
                     if (index >= 0) featureListeners.splice(index, 1)
                   }
                 },
+                set: async () => true,
               }
               : undefined
           },
@@ -151,13 +153,26 @@ afterEach(() => {
 })
 
 describe('client apply registration', () => {
+  it('registers an isolated keyed settings page in the plugin bundle config slot', () => {
+    const { ctx, injected, registrations } = recordedContext()
+    apply(ctx)
+
+    expect(injected).toContain('plugins.bundle.config')
+    expect(registrations).toContainEqual(expect.objectContaining({
+      name: 'plugins.bundle.config',
+      key: 'dsh-markdown-input',
+      locale: NS,
+    }))
+  })
+
   it('leaves the competing composer and message slots untouched when settings are absent', () => {
     const { ctx, injected, registrations } = recordedContext({ featureSettings: null })
     apply(ctx)
     expect(injected).not.toContain('conversation.composer')
     expect(injected).not.toContain('conversation.chat.node')
     expect(injected).not.toContain('conversation.user.text.node')
-    expect(registrations.map(entry => entry.name)).toEqual(['conversation.composer.dock'])
+    expect(registrations.map(entry => entry.name)).toContain('plugins.bundle.config')
+    expect(registrations.map(entry => entry.name)).not.toContain('conversation.composer')
   })
 
   it('waits for the first accepted settings snapshot before registering feature seats', () => {
@@ -216,6 +231,7 @@ describe('client apply registration', () => {
         'conversation.composer',
         'conversation.composer.dock',
         'conversation.user.text.node',
+        'plugins.bundle.config',
       ])
   })
 

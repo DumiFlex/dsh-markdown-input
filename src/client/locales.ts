@@ -239,6 +239,18 @@ const zh = {
   'secret.hide': '隐藏密钥',
   'message.referenceSummary': '引用会话 · {labels}',
   'message.referenceSeparator': '、',
+  'settings.title': 'Markdown 输入设置',
+  'settings.description': '这些选项彼此独立，默认关闭，以免与其他插件冲突。',
+  'settings.composer.label': '启用 Markdown 输入区',
+  'settings.composer.description': '用支持实时预览的 Markdown 编辑器替换原生输入区。',
+  'settings.messages.label': '将发送的用户消息渲染为 Markdown',
+  'settings.messages.description': '仅替换用户消息和排队消息的显示方式。',
+  'settings.loading': '正在加载 Markdown 输入设置…',
+  'settings.unavailable': '当前配置文件中无法读取此插件的设置。',
+  'settings.readOnly': '当前配置文件为只读，无法更改这些选项。',
+  'settings.reload': '更改会立即保存。启用或停用后，请重新加载 Web UI 以应用更改。',
+  'settings.error.refused': '设置未被保存，请刷新后重试。',
+  'settings.error.failed': '保存设置时发生错误，请重试。',
 } as const
 
 export type ComposerKey = keyof typeof zh
@@ -429,6 +441,18 @@ const en: Record<ComposerKey, string> = {
   'secret.hide': 'Hide secret',
   'message.referenceSummary': 'Referenced session · {labels}',
   'message.referenceSeparator': ', ',
+  'settings.title': 'Markdown Input settings',
+  'settings.description': 'These options are independent and off by default to avoid conflicts with other plugins.',
+  'settings.composer.label': 'Enable the Markdown composer',
+  'settings.composer.description': 'Replace the native composer with a live-preview Markdown editor.',
+  'settings.messages.label': 'Render sent user messages as Markdown',
+  'settings.messages.description': 'Changes the display of user and queued messages only.',
+  'settings.loading': 'Loading Markdown Input settings…',
+  'settings.unavailable': 'These plugin settings are unavailable in the current profile.',
+  'settings.readOnly': 'The current profile is read-only; these options cannot be changed.',
+  'settings.reload': 'Changes save immediately. Reload the Web UI after changing an option to apply it.',
+  'settings.error.refused': 'The setting was not saved. Refresh and try again.',
+  'settings.error.failed': 'Could not save this setting. Please try again.',
 }
 
 export { zh, en }

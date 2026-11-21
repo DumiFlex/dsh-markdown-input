@@ -68,8 +68,14 @@ import {
 } from './stats-pills-face.ts'
 import { installBusyEnterSource } from './submit-policy.ts'
 import { markdownInputSettingsOf, type MarkdownInputSettings } from './feature-settings.ts'
+import { createMarkdownInputSettingsCard, type MarkdownInputSettingsForm } from './settings-card.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    /** DSH Plugin Manager 0.1.7+ renders one keyed config page per bundle. */
+    'plugins.bundle.config': { kind: 'keyed'; scope: 'root' }
+  }
+
   interface LocaleNamespaceMap {
     /** Markdown composer copy. */
     'markdown-input': ComposerKey
@@ -89,6 +95,32 @@ export const inject = ['slots', 'locale']
  */
 function present(value: unknown): boolean {
   return value !== undefined && value !== null
+}
+
+/**
+ * Install this plugin's isolated config page when the host form exists.
+ * Missing settings services leave the competing feature seats safely off.
+ * @param ctx - client root context.
+ */
+function installSettingsCard(ctx: ClientContext): void {
+  let form: MarkdownInputSettingsForm | undefined
+  try {
+    const forms = ctx.get('configForms') as {
+      get?(namespace: string): MarkdownInputSettingsForm
+    } | undefined
+    form = forms?.get?.('markdown-input')
+  } catch {
+    return
+  }
+  if (!form) return
+
+  const t = ctx.locale.bind(NS)
+  const Card = createMarkdownInputSettingsCard(form, t)
+  ctx.slots.inject('plugins.bundle.config', () => ctx.slots.register({
+    name: 'plugins.bundle.config',
+    key: 'dsh-markdown-input',
+    locale: NS,
+  }, Card))
 }
 
 /**
@@ -473,4 +505,7 @@ export function apply(ctx: ClientContext): void {
     id: 'markdown-input-fallback',
     locale: NS,
   }, FallbackNotice))
+  // Register the settings page after conversation seats so each feature owns
+  // its own lifecycle/disposer without shifting the composer-chain ordering.
+  installSettingsCard(ctx)
 }

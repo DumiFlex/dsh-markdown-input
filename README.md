@@ -38,7 +38,7 @@ Every surface probes the host before it activates and degrades on its own: built
 
 ## Settings and plugin compatibility
 
-Both slot-replacing features are **off by default** to avoid taking over the composer or message-rendering seats used by other plugins. In DSH Settings, open the **Markdown Input** plugin's settings and enable **Markdown composer takeover** and/or **Markdown-rendered user messages** independently. These are generated from the plugin's volatile Config fields and are available in Desktop and Web. After saving, reload the UI/plugin for the selected features to take effect. Rich-text paste conversion is only active inside the Markdown composer; the native composer remains untouched when that feature is off.
+Both slot-replacing features are **off by default** to avoid taking over the composer or message-rendering seats used by other plugins. In DSH 44.7+, open **Plugins → dsh-markdown-input** to reach this plugin's own settings page, then independently enable **Enable the Markdown composer** and/or **Render sent user messages as Markdown**. These controls save immediately; reload the Web UI after changing them to apply the selected features. They do not change Claude Style or any other plugin's settings, and neither feature takes over its seat until explicitly enabled. Rich-text paste conversion is only active inside the Markdown composer; the native composer remains untouched when composer takeover is off.
 
 ## Install
 

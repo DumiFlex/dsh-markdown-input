@@ -25,5 +25,21 @@ export const name = 'markdown-input'
  * @param ctx - plugin context.
  */
 export function apply(ctx: Context): void {
-  void ctx
+  // This plugin owns a custom page in the Plugins UI. Disable generated
+  // settings pages only for this plugin instance; the effect is disposed with
+  // its fiber, so other plugins' settings policies are untouched.
+  ctx.inject(['settings'], (settingsCtx) => {
+    const settings = (settingsCtx as Context & {
+      settings?: {
+        configure?: (presentation: { auto?: boolean }, owner?: Context['fiber']) => () => void
+      }
+    }).settings
+    if (typeof settings?.configure !== 'function') return
+    const configure = settings.configure.bind(settings)
+
+    settingsCtx.effect(
+      () => configure({ auto: false }, ctx.fiber),
+      'markdown-input: settings page policy',
+    )
+  })
 }
