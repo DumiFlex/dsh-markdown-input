@@ -67,6 +67,7 @@ import {
   STATS_NS, installChatSource, installStatsSettingsSource, resetStatsLocale, setStatsLocale,
 } from './stats-pills-face.ts'
 import { installBusyEnterSource } from './submit-policy.ts'
+import { markdownInputSettingsOf, type MarkdownInputSettings } from './feature-settings.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -88,6 +89,22 @@ export const inject = ['slots', 'locale']
  */
 function present(value: unknown): boolean {
   return value !== undefined && value !== null
+}
+
+/**
+ * Read the plugin's generated ConfigForm snapshot. Missing forms or a read
+ * failure intentionally disable both slot-replacing features.
+ * @param ctx - client root context.
+ */
+function readFeatureSettings(ctx: ClientContext): MarkdownInputSettings {
+  try {
+    const forms = ctx.get('configForms') as {
+      get?(namespace: string): { getSnapshot?(): { value?: unknown } } | undefined
+    } | undefined
+    return markdownInputSettingsOf(forms?.get?.('markdown-input')?.getSnapshot?.()?.value)
+  } catch {
+    return markdownInputSettingsOf(undefined)
+  }
 }
 
 /**
@@ -315,6 +332,7 @@ export function apply(ctx: ClientContext): void {
   // same lazy, capability-detected way: a host build without the service
   // keeps the native default (queue — the pre-#79 behavior).
   installBusyEnterSource(ctx)
+  const featureSettings = readFeatureSettings(ctx)
   // Card-level crash latch (ADR-0005): a render exception inside the card —
   // or an editor-face probe failure — funnels into the unified fallback
   // (degrade.ts), which latches the takeover off for the page life and
@@ -324,29 +342,31 @@ export function apply(ctx: ClientContext): void {
   // session scope re-runs this inject thunk but must not re-attempt the
   // takeover; only reloading the browser half restarts it.
   let disposeEntry: (() => void) | undefined
-  bindComposerCrash(() => {
-    const dispose = disposeEntry
-    disposeEntry = undefined
-    dispose?.()
-  })
-  ctx.slots.inject('conversation.composer', () => {
-    // Session latch: once degraded, the native composer stays for the rest
-    // of the page life (ADR-0005 Q5).
-    if (takeoverDegraded()) return () => {}
-    const dispose = ctx.slots.register({
-      name: 'conversation.composer',
-      // After approvals/questions (1) and the subagent read-only composer
-      // (-10): pending interactions keep precedence over Markdown editing.
-      priority: 2,
-      select: () => MARKDOWN_TAKEOVER,
-      locale: NS,
-    }, TakeoverCard)
-    disposeEntry = dispose
-    return () => {
-      if (disposeEntry === dispose) disposeEntry = undefined
-      dispose()
-    }
-  })
+  if (featureSettings.composerEnabled) {
+    bindComposerCrash(() => {
+      const dispose = disposeEntry
+      disposeEntry = undefined
+      dispose?.()
+    })
+    ctx.slots.inject('conversation.composer', () => {
+      // Session latch: once degraded, the native composer stays for the rest
+      // of the page life (ADR-0005 Q5).
+      if (takeoverDegraded()) return () => {}
+      const dispose = ctx.slots.register({
+        name: 'conversation.composer',
+        // After approvals/questions (1) and the subagent read-only composer
+        // (-10): pending interactions keep precedence over Markdown editing.
+        priority: 2,
+        select: () => MARKDOWN_TAKEOVER,
+        locale: NS,
+      }, TakeoverCard)
+      disposeEntry = dispose
+      return () => {
+        if (disposeEntry === dispose) disposeEntry = undefined
+        dispose()
+      }
+    })
+  }
   // Keyed replacement of the user-message seats — turn-opening (`user`) and
   // queued mid-turn (`steering`) bubbles share identical node data and both
   // go Markdown; every other chat node kind keeps the host's own renderers.
@@ -357,7 +377,7 @@ export function apply(ctx: ClientContext): void {
   // (Markdown pipeline or copy/clock chrome) keeps the host's own renderers
   // — native bubbles with the native actions row.
   const messageCapability = userMessageCapability(primitives)
-  if (messageCapability.supported) {
+  if (messageCapability.supported && featureSettings.messageMarkdownEnabled) {
     for (const key of ['user', 'steering'] as const) {
       ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
         name: 'conversation.chat.node',
@@ -387,6 +407,8 @@ export function apply(ctx: ClientContext): void {
       key: 'text',
       priority: -1,
     }, MarkdownEchoText))
+  } else if (!featureSettings.messageMarkdownEnabled) {
+    console.info('[markdown-input] user-message Markdown rendering is off in plugin settings')
   } else {
     console.info(`[markdown-input] user-message Markdown rendering disabled: ${messageCapability.reason}`)
   }

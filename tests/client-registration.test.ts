@@ -49,6 +49,7 @@ function recordedContext(options: {
   workspaces?: unknown
   sidebarRight?: unknown
   sessions?: unknown
+  featureSettings?: unknown
 } = {}): {
   ctx: ClientContext
   injected: readonly string[]
@@ -71,6 +72,15 @@ function recordedContext(options: {
       if (key === 'workspaces') return options.workspaces
       if (key === 'sidebarRight') return options.sidebarRight
       if (key === 'sessions') return options.sessions
+      if (key === 'configForms') {
+        return {
+          get(namespace: string): unknown {
+            return namespace === 'markdown-input'
+              ? { getSnapshot: () => ({ value: options.featureSettings === undefined ? { composerEnabled: true, messageMarkdownEnabled: true } : options.featureSettings }) }
+              : undefined
+          },
+        }
+      }
       return key === 'remote' ? options.remote : undefined
     },
     effect(fn: () => unknown): unknown {
@@ -121,6 +131,15 @@ afterEach(() => {
 })
 
 describe('client apply registration', () => {
+  it('leaves the competing composer and message slots untouched when settings are absent', () => {
+    const { ctx, injected, registrations } = recordedContext({ featureSettings: null })
+    apply(ctx)
+    expect(injected).not.toContain('conversation.composer')
+    expect(injected).not.toContain('conversation.chat.node')
+    expect(injected).not.toContain('conversation.user.text.node')
+    expect(registrations.map(entry => entry.name)).toEqual(['conversation.composer.dock'])
+  })
+
   it('takes over the composer through one low-priority chain entry', () => {
     const { ctx, injected, registrations } = recordedContext()
     apply(ctx)

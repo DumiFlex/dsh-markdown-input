@@ -36,6 +36,10 @@ Pasting rich text from a web page or a word processor converts the clipboard's `
 
 Every surface probes the host before it activates and degrades on its own: built-in takeover panels (approvals, questions, subagents) outrank this plugin and keep the composer whenever they need it; a missing host surface sheds its own feature, never the text face; and a card-level error boundary silently falls back to the native composer with the draft intact.
 
+## Settings and plugin compatibility
+
+Both slot-replacing features are **off by default** to avoid taking over the composer or message-rendering seats used by other plugins. In the dsh plugin settings, enable **Markdown composer takeover** and/or **Markdown-rendered user messages** independently. Changes are applied when the web UI/plugin reloads. Rich-text paste conversion is only active inside the Markdown composer; the native composer remains untouched when that feature is off.
+
 ## Install
 
 Requires dsh with the web UI (the desktop app). The build and automated suite currently target dsh `0.2.1-rc.2`; the last **on-device** verification is `0.2.0-rc.2` — see the [compatibility matrix](#compatibility) before installing.

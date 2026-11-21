@@ -22,6 +22,11 @@ import type { MarkdownComposerProps } from '../src/client/MarkdownComposer.tsx'
 function recordedContext(): { ctx: ClientContext, disposers: readonly ReturnType<typeof vi.fn>[] } {
   const disposers: Array<ReturnType<typeof vi.fn>> = []
   const ctx = {
+    get(key: string): unknown {
+      return key === 'configForms'
+        ? { get: () => ({ getSnapshot: () => ({ value: { composerEnabled: true, messageMarkdownEnabled: true } }) }) }
+        : undefined
+    },
     effect(fn: () => unknown): unknown {
       return fn()
     },
