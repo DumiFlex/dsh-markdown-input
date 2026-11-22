@@ -68,6 +68,8 @@ import {
 } from './stats-pills-face.ts'
 import { installBusyEnterSource } from './submit-policy.ts'
 import { markdownInputSettingsOf, type MarkdownInputSettings } from './feature-settings.ts'
+import { NativeMarkdownAdapter } from './NativeMarkdownAdapter.tsx'
+import { MarkdownUserTextRun } from './message-text-adapter.tsx'
 import { createMarkdownInputSettingsCard, type MarkdownInputSettingsForm } from './settings-card.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -411,6 +413,24 @@ export function apply(ctx: ClientContext): void {
   // keeps the native default (queue — the pre-#79 behavior).
   installBusyEnterSource(ctx)
   watchFeatureSettings(ctx, (featureSettings) => {
+    const claudeStyle = typeof document !== 'undefined' && document.body?.hasAttribute('data-dsh-claude-style')
+    if (claudeStyle) {
+      // Extend the original editor and bubble instead of replacing their DOM.
+      if (featureSettings.composerEnabled) {
+        ctx.slots.inject('conversation.input.overlay', () => ctx.slots.register({
+          name: 'conversation.input.overlay',
+          id: 'markdown-input-native',
+        }, NativeMarkdownAdapter))
+      }
+      if (featureSettings.messageMarkdownEnabled && present(primitives.MarkdownText) && present(primitives.UserTextRun)) {
+        ctx.slots.inject('conversation.user.text.node', () => ctx.slots.register({
+          name: 'conversation.user.text.node',
+          key: 'text',
+          priority: -1,
+        }, MarkdownUserTextRun))
+      }
+      return
+    }
     // Card-level crash latch (ADR-0005): a render exception inside the card —
     // or an editor-face probe failure — funnels into the unified fallback
     // (degrade.ts), which latches the takeover off for the page life and

@@ -153,6 +153,24 @@ afterEach(() => {
 })
 
 describe('client apply registration', () => {
+  it('enhances the native composer and text without replacing Claude Style surfaces', () => {
+    document.body.setAttribute('data-dsh-claude-style', '')
+    try {
+      const { ctx, injected, registrations } = recordedContext()
+      apply(ctx)
+      expect(injected).not.toContain('conversation.composer')
+      expect(injected).not.toContain('conversation.chat.node')
+      expect(registrations).toContainEqual(expect.objectContaining({
+        name: 'conversation.input.overlay', id: 'markdown-input-native',
+      }))
+      expect(registrations).toContainEqual(expect.objectContaining({
+        name: 'conversation.user.text.node', key: 'text',
+      }))
+    } finally {
+      document.body.removeAttribute('data-dsh-claude-style')
+    }
+  })
+
   it('registers an isolated keyed settings page in the plugin bundle config slot', () => {
     const { ctx, injected, registrations } = recordedContext()
     apply(ctx)

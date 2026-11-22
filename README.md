@@ -40,6 +40,8 @@ Every surface probes the host before it activates and degrades on its own: built
 
 Both slot-replacing features are **off by default** to avoid taking over the composer or message-rendering seats used by other plugins. In DSH 44.7+, open **Plugins → dsh-markdown-input** to reach this plugin's own settings page, then independently enable **Enable the Markdown composer** and/or **Render sent user messages as Markdown**. These controls save immediately; reload the Web UI after changing them to apply the selected features. They do not change Claude Style or any other plugin's settings, and neither feature takes over its seat until explicitly enabled. Rich-text paste conversion is only active inside the Markdown composer; the native composer remains untouched when composer takeover is off.
 
+When Claude Style is active on UI reload, Markdown Input keeps the native composer and message bubbles. The composer highlights Markdown source in place (not CodeMirror live preview) and converts rich-text paste; sent-message rendering enhances plain text runs without replacing native actions or reference chips. Both settings can be enabled alongside the skin.
+
 ## Install
 
 Requires dsh with the web UI (the desktop app). The build and automated suite currently target dsh `0.2.1-rc.2`; the last **on-device** verification is `0.2.0-rc.2` — see the [compatibility matrix](#compatibility) before installing.

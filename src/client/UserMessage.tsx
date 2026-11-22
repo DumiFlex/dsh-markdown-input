@@ -29,6 +29,7 @@ import type {
   ChatNodeViewProps, UserContentAttachment, UserMessageNode,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { UserTextNodeProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { markdownLabels } from './message-markdown-labels.ts'
 import { MessageActions } from './MessageActions.tsx'
 import { echoLocale } from './echo-text-face.ts'
 import { referenceActions } from './reference-actions-face.ts'
@@ -44,38 +45,6 @@ type UserFileBlock = Extract<UserMessageNode['content'][number], { type: 'file' 
 
 /** Chat-node seats this renderer replaces; the host serves both with one view. */
 export type MarkdownSeatKind = 'user' | 'steering'
-
-/**
- * The six `chat` namespace keys the Markdown chrome reads (fence toolbar,
- * copy action, footnotes). Both the durable seat's and the echo seat's
- * translate types accept at least these, so one labels builder serves both.
- */
-type MarkdownChromeKey =
-  | 'copy'
-  | 'copied'
-  | 'codeBlock.title'
-  | 'codeBlock.wrap'
-  | 'codeBlock.unwrap'
-  | 'markdown.footnotes'
-
-/** Chat-seat copy for the Markdown chrome (same keys the host passes down). */
-function markdownLabels(t: (key: MarkdownChromeKey) => string): MarkdownLabels {
-  return {
-    code: {
-      copyLabel: t('copy'),
-      copiedLabel: t('copied'),
-      // The fence toolbar's own labels (#77): without them CodeBlock sheds
-      // the card + wrap/unwrap toggle and falls back to the bare copy
-      // banner. Same `chat` keys the host's markdown-labels fold uses.
-      toolbarLabels: {
-        codeLabel: t('codeBlock.title'),
-        wrapLabel: t('codeBlock.wrap'),
-        unwrapLabel: t('codeBlock.unwrap'),
-      },
-    },
-    footnotes: t('markdown.footnotes'),
-  }
-}
 
 /** Is this projected piece a reference chip (vs a plain text run)? */
 function isChip(piece: ReactNode): boolean {
